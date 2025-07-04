@@ -1,8 +1,11 @@
 import numpy as np
 from typing import Optional
 
-from utils.constant import K_b, J_to_eV, J_to_kJ_mol, J_to_kcal_mol
-
+from lgmc.utils.constant import K_b, J_to_eV, J_to_kJ_mol, J_to_kcal_mol
+"""
+dimensionless로 변경해서 hi리턴하게 바꾸고
+critical temperature / coex critical chemcial potential / eps 등등 확인해서 넣게
+"""
 
 class Prob:
     """
