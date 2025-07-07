@@ -1,24 +1,19 @@
 import numpy as np
 from typing import Optional
+from lgmc.utils.constant import Beta_c
 
-from lgmc.utils.constant import K_b, J_to_eV, J_to_kJ_mol, J_to_kcal_mol
-"""
-dimensionless로 변경해서 hi리턴하게 바꾸고
-critical temperature / coex critical chemcial potential / eps 등등 확인해서 넣게
-"""
 
 class Prob:
     """
     Class to initialize local energies and transition probabilities 
-    for lattice gas Monte Carlo simulations.
+    for lattice gas Monte Carlo simulations in reduced units.
 
     Attributes:
-        temp (float): Simulation temperature.
-        eps_nn (float): Nearest neighbor interaction energy.
-        eps_s (Optional[float]): Surface interaction energy (for heterogeneous systems).
-        mu (Optional[float]): Chemical potential (required for Glauber dynamics).
+        temp (float): Reduced temperature T* = T / T_c.
+        eps_nn (float): Nearest neighbor interaction energy (set to 1.0 by default).
+        eps_s (Optional[float]): Surface interaction energy (for heterogeneous systems, relative to eps_nn).
+        mu (Optional[float]): Chemical potential (required for Glauber dynamics, relative to eps_nn).
         NN (int): Number of nearest neighbors.
-        beta (float): Inverse temperature (1 / k_B T).
         sys (str): System type ('homo' or 'hete').
         mode (str): Dynamics mode ('glauber' or 'kawasaki').
         hi (np.ndarray): Local energy table.
@@ -27,38 +22,24 @@ class Prob:
     def __init__(
         self,
         temp: float,
-        eps_NN: float,
+        eps_NN: float = 1.0,
         num_NN: int = 6,
         sys: str = 'homo',
         eps_s: Optional[float] = None,
         mode: str = 'kawasaki',
-        mu: Optional[float] = None,
-        eps_unit: str = 'eV'
+        mu: Optional[float] = None
     ):
         # Number of nearest neighbors
         self.NN = num_NN
 
         # Simulation temperature
-        self.temp = temp
+        self.temp = temp                   # T* = T / Tc
+        self.beta = Beta_c / self.temp     # beta* = beta_c / T*
 
         # Interaction energies
         self.eps_nn = eps_NN
         self.eps_s = eps_s
         self.mu = mu
-
-        # Convert Boltzmann constant to appropriate energy unit
-        if eps_unit == 'J':
-            self.K_b = K_b
-        elif eps_unit == 'eV':
-            self.K_b = J_to_eV(K_b)
-        elif eps_unit == 'kJ/mol':
-            self.K_b = J_to_kJ_mol(K_b)
-        elif eps_unit == 'kcal/mol':
-            self.K_b = J_to_kcal_mol(K_b)
-        else:
-            raise ValueError("eps_unit must be 'J', 'eV', 'kJ/mol', or 'kcal/mol'.")
-
-        self.beta = 1.0 / (self.K_b * self.temp)
 
         # System type
         self.sys = sys
@@ -176,14 +157,13 @@ class Prob:
         return tprob
 
 if __name__=='__main__':
-    temp = 300 #K
-    eps_NN = 4.8 #kJ/mol
+    temp = 0.5 #K
+    eps_NN = 1.0 #kJ/mol
     eps_s = 0.1*eps_NN
-    eps_unit = 'kJ/mol'
-    sys='homo'
-    mode='glauber'
+    sys='hete'
+    mode='kawasaki'
     mu = 0.4*eps_NN
-    prob = Prob(temp=temp, eps_NN=eps_NN, eps_s=eps_s, sys=sys, mode=mode, mu=mu, eps_unit=eps_unit)
+    prob = Prob(temp=temp, eps_NN=eps_NN, eps_s=eps_s, sys=sys, mode=mode, mu=mu)
 
     print(prob.hi)
     print(prob.tprob)
