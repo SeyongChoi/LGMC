@@ -1,4 +1,6 @@
 import numpy as np
+from lgmc.utils.to_xyz import to_xyz
+from lgmc.utils.pbc import apply_pbc
 from typing import Optional, Tuple, List
 
 class Lattice:
@@ -23,6 +25,7 @@ class Lattice:
                  pbc: List[bool] = [True, True, True],
                  sys: str = 'homo', seed: int = 1234):
         self.r = r
+        self.dim = 2 * (self.r + 1) + 1
         self.conc = conc
         self.sys = sys
         self.seed = seed
@@ -38,22 +41,13 @@ class Lattice:
         else:
             raise ValueError("Sys must be either 'homo' or 'hete'.")
 
-        self._apply_pbc()
+        # self.lattice = self._apply_pbc()
         
 
-    def _apply_pbc(self) -> None:
+    def _apply_pbc(self) -> np.ndarray:
         """Apply periodic boundary conditions to the lattice."""
-        if self.pbc[0]:
-            self.lattice[0, 1:-1, 1:-1] = self.lattice[-2, 1:-1, 1:-1]
-            self.lattice[-1, 1:-1, 1:-1] = self.lattice[1, 1:-1, 1:-1]
-
-        if self.pbc[1]:
-            self.lattice[1:-1, 0, 1:-1] = self.lattice[1:-1, -2, 1:-1]
-            self.lattice[1:-1, -1, 1:-1] = self.lattice[1:-1, 1, 1:-1]
-
-        if self.pbc[2]:
-            self.lattice[1:-1, 1:-1, 0] = self.lattice[1:-1, 1:-1, -2]
-            self.lattice[1:-1, 1:-1, -1] = self.lattice[1:-1, 1:-1, 1]
+        return apply_pbc(self.lattice, self.pbc)
+        
 
     def _init_lattice_homo(self) -> Tuple[np.ndarray, int]:
         """
@@ -62,16 +56,16 @@ class Lattice:
         Returns:
             Tuple[np.ndarray, int]: The lattice array and number of inserted particles.
         """
-        dim = 2 * (self.r + 1) + 1
+        
         rng = np.random.default_rng(self.seed)
 
-        grid = np.indices((dim - 2, dim - 2, dim - 2)).reshape(3, -1).T + 1
+        grid = np.indices((self.dim - 2, self.dim - 2, self.dim - 2)).reshape(3, -1).T + 1
         n_insert = int(self.conc * len(grid))
         print(f"[homo] total sites: {len(grid)}, inserted: {n_insert}, actual conc: {n_insert / len(grid):.4f}")
 
         chosen = grid[rng.choice(len(grid), size=n_insert, replace=False)]
 
-        lattice = np.zeros((dim, dim, dim), dtype=np.float64)
+        lattice = np.zeros((self.dim, self.dim, self.dim), dtype=np.float64)
         lattice[chosen[:, 0], chosen[:, 1], chosen[:, 2]] = 1
 
         return lattice, n_insert
@@ -83,13 +77,14 @@ class Lattice:
         Returns:
             Tuple[np.ndarray, int]: The lattice array and number of inserted particles.
         """
-        dim = 2 * (self.r + 1) + 1
+        
         rng = np.random.default_rng(self.seed)
 
-        lattice = np.zeros((dim, dim, dim), dtype=np.float64)
-        lattice[:, :, 1] = 2  # surface layer at z = 1 (== z = -r)
+        lattice = np.zeros((self.dim, self.dim, self.dim), dtype=np.float64)
+        surface_z_idx = 1
+        lattice[:, :, surface_z_idx] = 2  # surface layer at z = 1 (== z = -r)
 
-        grid = np.indices((dim - 2, dim - 2, dim - 2)).reshape(3, -1).T + 1
+        grid = np.indices((self.dim - 2, self.dim - 2, self.dim - 2)).reshape(3, -1).T + 1
         available_sites = grid[grid[:, 2] != 1]  # exclude surface
 
         n_insert = int(self.conc * len(available_sites))
@@ -110,25 +105,15 @@ class Lattice:
         Returns:
             str: XYZ format string.
         """
-        coords = np.argwhere(self.lattice > 0)
-        n_atoms = len(coords)
-        lines = [str(n_atoms), "Lattice XYZ format"]
+        length = self.dim - 2
+        comment = f'lattice="{length}  0  0  0  {length}  0  0  0  {length}"  origin="1 1 1" properties=species:S:1:pos:R:3'
 
-        for x, y, z in coords:
-            atom = 'X' if self.lattice[x, y, z] == 1 else 'S'
-            lines.append(f"{atom} {x} {y} {z}")
-
-        xyz_string = "\n".join(lines)
-
-        if filename:
-            with open(filename, 'w') as f:
-                f.write(xyz_string)
-
-        return xyz_string
+        return to_xyz(self.dim, self.lattice, filename, comment)
+        
 
 
 if __name__=='__main__':
-    r = 10
+    r = 10   # 버퍼까지 치면 20 + 1 + 2 --> 23 // 버퍼 빼면 21
     conc = 0.01
     pbc = [True, True, False]
     sys = 'hete'
@@ -136,3 +121,8 @@ if __name__=='__main__':
 
     print(lattice.n_particle)
     lattice.to_xyz(f'init_{sys}.xyz')
+
+    count = 0
+    for i in range(1,22):
+        count += 1
+    print(count)
