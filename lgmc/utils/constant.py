@@ -1,3 +1,22 @@
+# Bulk Critical Temperature (simple cubic)
+# 
+# For a lattice gas model on a simple cubic lattice, the critical inverse temperature (β_c)
+# corresponds to the critical point of the 3D Ising model due to their statistical equivalence.
+# The relationship between the two is:
+#
+#     β_c^LG = 4 × β_c^Ising
+#
+# where:
+#     β_c^Ising ≈ 0.2216544  (critical inverse temperature of the Ising model with J = 1)
+#
+# Thus:
+#     β_c^LG ≈ 4 × 0.2216544 ≈ 0.8866176
+#
+# This value is widely used as the reduced critical inverse temperature (β_c*) in LGMC simulations
+# for simple cubic lattices. It can also be found in high-precision Ising studies and lattice gas
+# literature, sometimes written as 0.88652482 depending on the numerical method used.
+Beta_c = 0.8866176
+
 # Avogadro's number
 NA = 6.02214076e23 # [mol⁻¹]
 # Boltzman Factor
