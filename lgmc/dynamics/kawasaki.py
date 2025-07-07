@@ -48,7 +48,7 @@ class KawasakiMC:
             [0, 0, 1], [0, 0, -1]
         ])
 
-    def step(self, n_steps: int = 1, verbose: bool = False, save_dir: Optional[str] = None) -> None:
+    def step(self, n_steps: int = 1, verbose: bool = False, save_dir: Optional[str] = None, n_sample: Optional[int] = 1) -> None:
         """
         Perform Kawasaki MC steps and optionally save extxyz files per step.
 
@@ -103,9 +103,9 @@ class KawasakiMC:
                     self._update_pbc_boundary(x2, y2, z2)
                     accepted += 1
 
-            if save_dir is not None:
+            if save_dir is not None and (step_idx % n_sample == 0):
                 os.makedirs(save_dir, exist_ok=True)
-                fname = f"{save_dir}/lattice_step_{step_idx:05d}.extxyz"
+                fname = f"{save_dir}/lattice_step_{step_idx:07d}.extxyz"
                 self.to_xyz(step=step_idx, filename=fname)
 
             if verbose:
@@ -259,13 +259,13 @@ class KawasakiMC:
 
 if __name__ == '__main__':
     r = 10
-    conc = 0.05
+    conc = 0.1
     sys = 'homo'
     pbc = [True, True, True] if sys == 'homo' else [True, True, False]
     
     lattice = Lattice(r=r, conc=conc, pbc=pbc, sys=sys)
 
-    temp = 0.2
+    temp = 0.3
     eps_NN = 1.0
     eps_s = 0.1 * eps_NN
     mode = 'kawasaki'
