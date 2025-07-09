@@ -23,6 +23,7 @@ cdef extern from "stdlib.h":
 cdef extern from "math.h":
     double exp(double)
 
+# PBC wrap helper
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.cdivision(True)
@@ -31,6 +32,7 @@ cdef inline int wrap_coord(int val, int dim, bint do_pbc) nogil:
         return (val - 1) % (dim - 2) + 1
     return val
 
+# ΔH 계산: homogeneous
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.cdivision(True)
@@ -41,6 +43,23 @@ cdef inline double calc_delta_H_homo(int ci, int cj, int ci_sum, int cj_sum,
     cdef int idx2 = cj_sum - 1 if cj_sum >= 0 else 0
     return hi[cj, idx1] + hi[ci, idx2] - (hi[ci, ci_sum] + hi[cj, cj_sum])
 
+# ΔH 계산: heterogeneous
+@cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.cdivision(True)
+cdef inline double calc_delta_H_hete(int ci, int cj,
+                                     int ci_sum, int cj_sum,
+                                     int ci_surf, int cj_surf,
+                                     double[:, :, :] hi) nogil:
+    cdef int n_max = hi.shape[2] - 1
+    cdef int idx1 = ci_sum + 1 if ci_sum <= n_max else n_max
+    cdef int idx2 = cj_sum - 1 if cj_sum >= 0 else 0
+    # H_old = hi[ci, ci_surf, ci_sum] + hi[cj, cj_surf, cj_sum]
+    # H_new = hi[cj, ci_surf, idx1] + hi[ci, cj_surf, idx2]
+    return (hi[cj, ci_surf, idx1] + hi[ci, cj_surf, idx2]
+            - (hi[ci, ci_surf, ci_sum] + hi[cj, cj_surf, cj_sum]))
+
+# neighbor sum helper
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.cdivision(True)
@@ -51,80 +70,81 @@ cdef int get_neighbor_sum(int[:, :, :] lattice,
     cdef int lx = lattice.shape[0]
     cdef int ly = lattice.shape[1]
     cdef int lz = lattice.shape[2]
-    for dx, dy, dz in [(1,0,0), (-1,0,0), (0,1,0), (0,-1,0), (0,0,1), (0,0,-1)]:
-        nx, ny, nz = x + dx, y + dy, z + dz
-        nx = wrap_coord(nx, lx, pbc0)
-        ny = wrap_coord(ny, ly, pbc1)
-        nz = wrap_coord(nz, lz, pbc2)
+    for dx, dy, dz in [(1,0,0),(-1,0,0),(0,1,0),(0,-1,0),(0,0,1),(0,0,-1)]:
+        nx = wrap_coord(x+dx, lx, pbc0)
+        ny = wrap_coord(y+dy, ly, pbc1)
+        nz = wrap_coord(z+dz, lz, pbc2)
         val = lattice[nx, ny, nz]
-        # count only 0 or 1
         if val == 0 or val == 1:
             total += val
     return total
 
+# surface contact helper
 @cython.boundscheck(False)
 @cython.wraparound(False)
-@cython.cdivision(True)
-cpdef tuple move_one_step(int[:, :, :] lattice,
-                          double[:, :] hi,
-                          int[:, :] neighbor_offsets,
-                          double beta,
-                          bint pbc0, bint pbc1, bint pbc2) nogil:
-    """
-    Perform one MC sweep (Kawasaki exchange attempts over all 1-sites).
-    Returns a tuple (accepted_swaps, updated_lattice).
-    """
-    cdef int nx, ny, nz, ox, oy, oz
-    cdef int x, y, z, i, j, idx, accepted = 0
-    cdef int ci, cj, ci_sum, cj_sum, offset_idx
-    cdef int dim = lattice.shape[0]
+cdef inline int is_surface(int x, int y, int z,
+                            int[:, :, :] lattice) nogil:
+    # surface layer z==1 (outside boundary)
+    return 1 if lattice[x, y, z-1] == 2 else 0
 
-    # temporary array of coordinates (could be preallocated and passed in)
-    coords = <int[:, :] > cython.malloc(sizeof(int) * (dim-2)*(dim-2)*(dim-2) * 3)
-    cdef int n = 0
-
-    # collect positions of ci=1
-    for x in range(1, dim-1):
-        for y in range(1, dim-1):
-            for z in range(1, dim-1):
-                if lattice[x, y, z] == 1:
-                    coords[n, 0] = x
-                    coords[n, 1] = y
-                    coords[n, 2] = z
-                    n += 1
-
-    # shuffle via rand
-    for i in range(n-1, 0, -1):
-        j = rand() % (i+1)
-        for idx in range(3): coords[i, idx], coords[j, idx] = coords[j, idx], coords[i, idx]
-
-    # attempt swaps in parallel
+# Move: homogeneous
+cpdef int move_homo(int[:, :, :] lattice,
+                    double[:, :] hi,
+                    int[:, :] neighbor_offsets,
+                    double beta,
+                    bint pbc0, bint pbc1, bint pbc2,
+                    int[:, :] coords,
+                    int n) nogil:
+    cdef int i, x, y, z, nx, ny, nz, ox, oy, oz
+    cdef int ci, cj, ci_sum, cj_sum, offset_idx, accepted = 0
+    cdef double prob, dH
     for i in prange(n, nogil=True):
-        x = coords[i, 0]; y = coords[i, 1]; z = coords[i, 2]
-        # pick random neighbor direction
+        x = coords[i,0]; y = coords[i,1]; z = coords[i,2]
         offset_idx = rand() % neighbor_offsets.shape[0]
-        ox = neighbor_offsets[offset_idx, 0]
-        oy = neighbor_offsets[offset_idx, 1]
-        oz = neighbor_offsets[offset_idx, 2]
-        nx = wrap_coord(x + ox, dim, pbc0)
-        ny = wrap_coord(y + oy, dim, pbc1)
-        nz = wrap_coord(z + oz, dim, pbc2)
-
-        ci = lattice[x, y, z]
-        cj = lattice[nx, ny, nz]
-        if ci != 1 or cj == 1:
-            continue
-
-        ci_sum = get_neighbor_sum(lattice, x, y, z, pbc0, pbc1, pbc2)
-        cj_sum = get_neighbor_sum(lattice, nx, ny, nz, pbc0, pbc1, pbc2)
-
-        # Metropolis criterion
-        if calc_delta_H_homo(ci, cj, ci_sum, cj_sum, hi) <= 0 or \
-           cython.cast(double, rand())/RAND_MAX < exp(-beta * calc_delta_H_homo(ci, cj, ci_sum, cj_sum, hi)):
-            # swap
-            lattice[x, y, z] = cj
-            lattice[nx, ny, nz] = ci
+        ox = neighbor_offsets[offset_idx,0]; oy = neighbor_offsets[offset_idx,1]; oz = neighbor_offsets[offset_idx,2]
+        nx = wrap_coord(x+ox, lattice.shape[0], pbc0)
+        ny = wrap_coord(y+oy, lattice.shape[1], pbc1)
+        nz = wrap_coord(z+oz, lattice.shape[2], pbc2)
+        ci = lattice[x,y,z]; cj = lattice[nx,ny,nz]
+        if ci != 1 or cj == 1: continue
+        ci_sum = get_neighbor_sum(lattice, x,y,z, pbc0,pbc1,pbc2)
+        cj_sum = get_neighbor_sum(lattice, nx,ny,nz, pbc0,pbc1,pbc2)
+        dH = calc_delta_H_homo(ci, cj, ci_sum, cj_sum, hi)
+        prob = rand() / <double>RAND_MAX
+        if dH <= 0 or prob < exp(-beta * dH):
+            lattice[x,y,z] = cj
+            lattice[nx,ny,nz] = ci
             accepted += 1
-    cython.free(coords)
-    # Return accepted count and updated lattice
-    return accepted, lattice
+    return accepted
+
+# Move: heterogeneous
+cpdef int move_hete(int[:, :, :] lattice,
+                    double[:, :, :] hi,
+                    int[:, :] neighbor_offsets,
+                    double beta,
+                    bint pbc0, bint pbc1, bint pbc2,
+                    int[:, :] coords,
+                    int n) nogil:
+    cdef int i, x, y, z, nx, ny, nz, ox, oy, oz
+    cdef int ci, cj, ci_sum, cj_sum, ci_s, cj_s, offset_idx, accepted = 0
+    cdef double prob, dH
+    for i in prange(n, nogil=True):
+        x = coords[i,0]; y = coords[i,1]; z = coords[i,2]
+        offset_idx = rand() % neighbor_offsets.shape[0]
+        ox = neighbor_offsets[offset_idx,0]; oy = neighbor_offsets[offset_idx,1]; oz = neighbor_offsets[offset_idx,2]
+        nx = wrap_coord(x+ox, lattice.shape[0], pbc0)
+        ny = wrap_coord(y+oy, lattice.shape[1], pbc1)
+        nz = wrap_coord(z+oz, lattice.shape[2], pbc2)
+        ci = lattice[x,y,z]; cj = lattice[nx,ny,nz]
+        if ci != 1 or cj == 1: continue
+        ci_sum = get_neighbor_sum(lattice, x,y,z, pbc0,pbc1,pbc2)
+        cj_sum = get_neighbor_sum(lattice, nx,ny,nz, pbc0,pbc1,pbc2)
+        ci_s = is_surface(x, y, z, lattice)
+        cj_s = is_surface(nx, ny, nz, lattice)
+        dH = calc_delta_H_hete(ci, cj, ci_sum, cj_sum, ci_s, cj_s, hi)
+        prob = rand() / <double>RAND_MAX
+        if dH <= 0 or prob < exp(-beta * dH):
+            lattice[x,y,z] = cj
+            lattice[nx,ny,nz] = ci
+            accepted += 1
+    return accepted
