@@ -1,4 +1,8 @@
 /lgmc/mc_extxyz_output/
 /old_fortran/
+/lgmc.egg-info/
+/build/
+*.c
+*.pyd
 *.pyc
 *.extxyz
