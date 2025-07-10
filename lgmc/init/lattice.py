@@ -65,7 +65,7 @@ class Lattice:
 
         chosen = grid[rng.choice(len(grid), size=n_insert, replace=False)]
 
-        lattice = np.zeros((self.dim, self.dim, self.dim), dtype=np.int64)
+        lattice = np.zeros((self.dim, self.dim, self.dim), dtype=np.int32)
         lattice[chosen[:, 0], chosen[:, 1], chosen[:, 2]] = 1
 
         return lattice, n_insert
@@ -80,7 +80,7 @@ class Lattice:
         
         rng = np.random.default_rng(self.seed)
 
-        lattice = np.zeros((self.dim, self.dim, self.dim), dtype=np.int64)
+        lattice = np.zeros((self.dim, self.dim, self.dim), dtype=np.int32)
         surface_z_idx = 1
         lattice[:, :, surface_z_idx] = 2  # surface layer at z = 1 (== z = -r)
 
