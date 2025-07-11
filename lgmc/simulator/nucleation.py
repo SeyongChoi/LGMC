@@ -116,24 +116,6 @@ class NucleationSimulator:
             if verbose:
                 it.set_postfix(accepted=accepted)
     
-    def to_xyz(self, step: int, filename: Optional[str] = None) -> str:
-        """
-        현재 lattice 상태를 extxyz 포맷으로 저장.
-
-        Returns:
-            str: extxyz 포맷 문자열
-        """
-        length = self.dim - 2
-        total_energy = 0.0 #self._calculate_total_energy()
-
-        comment = (
-            f'lattice="{length}  0  0  0  {length}  0  0  0  {length}" '
-            f'origin="1 1 1" properties=species:S:1:pos:R:3  '
-            f'energy={total_energy:.6f}  step={step}'
-        )
-
-        return to_xyz(self.dim, self.lattice, filename, comment)
-    
     def run(self, n_steps: int = 1,
             verbose: bool = False,
             n_sample: int = 1,
@@ -150,8 +132,89 @@ class NucleationSimulator:
         """
 
         self.step(n_steps=n_steps, verbose=verbose, n_sample=n_sample, save_dir=save_dir)
+    
+    def _get_neighbor_sum(self, x: int, y: int, z: int) -> int:
+        """
+        현재 위치 (x,y,z)의 입자 상태 ci와 이웃 cj들의 합(cj_sum)을 계산.
+        Heterogeneous일 때 표면 접촉 여부 cs 고려 가능.
+
+        Returns:
+            int: cj_sum (occupied 이웃 개수)
+        """
+        cj_sum = 0
+        lx, ly, lz = self.lattice.shape
+
+        for dx, dy, dz in self.neighbor_offsets:
+            nx, ny, nz = x + dx, y + dy, z + dz
+            # Wrap or skip out-of-bound
+            if self.pbc[0]:
+                nx = (nx - 1) % (lx - 2) + 1
+            elif nx < 1 or nx >= lx - 1:
+                continue
+
+            if self.pbc[1]:
+                ny = (ny - 1) % (ly - 2) + 1
+            elif ny < 1 or ny >= ly - 1:
+                continue
+
+            if self.pbc[2]:
+                nz = (nz - 1) % (lz - 2) + 1
+            elif nz < 1 or nz >= lz - 1:
+                continue
 
 
+            if self.lattice[nx, ny, nz] in (0, 1):
+                cj_sum += self.lattice[nx, ny, nz]
+
+        return cj_sum
+
+    def _is_surface_contact(self, x: int, y: int, z: int) -> int:
+        """
+        Heterogeneous 시스템에서 위치가 표면과 접촉하는지 여부 판단.
+        surface layer: z == 1 으로 가정 (Lattice 클래스 기준)
+        """
+        return int(self.sys == 'hete' and self.lattice[x, y, z - 1] == 2)
+    
+    def _calculate_total_energy(self) -> float:
+        """
+        현재 lattice 전체 local energy 합 계산.
+        각 site ci 상태, 주변 cj_sum, (hetero면 cs) 이용해 hi에서 계산.
+
+        Returns:
+            float: 전체 에너지
+        """
+        total_energy = 0.0
+        for x in range(1, self.dim - 1):
+            for y in range(1, self.dim - 1):
+                for z in range(1, self.dim - 1):
+                    ci = int(self.lattice[x, y, z])
+                    if ci != 1:
+                        continue
+                    cs = int(self._is_surface_contact(x, y, z)) if self.sys == 'hete' else 0
+                    cj_sum = int(self._get_neighbor_sum(x, y, z))
+                    total_energy += int(self.hi_hete[ci, cs, cj_sum]) if self.sys == 'hete' else int(self.hi_homo[ci, cj_sum])
+
+        return total_energy
+
+
+    def to_xyz(self, step: int, filename: Optional[str] = None) -> str:
+        """
+        현재 lattice 상태를 extxyz 포맷으로 저장.
+
+        Returns:
+            str: extxyz 포맷 문자열
+        """
+        length = self.dim - 2
+        total_energy = self._calculate_total_energy()
+
+        comment = (
+            f'lattice="{length}  0  0  0  {length}  0  0  0  {length}" '
+            f'origin="1 1 1" properties=species:S:1:pos:R:3  '
+            f'energy={total_energy:.6f}  step={step}'
+        )
+
+        return to_xyz(self.dim, self.lattice, filename, comment)
+    
 if __name__=='__main__':
     r = 20
     conc = 0.1
@@ -165,4 +228,4 @@ if __name__=='__main__':
     simulator = NucleationSimulator(r=r, conc=conc, pbc=pbc, sys=sys,
                                     temp=temp, eps_NN=eps_NN, eps_s=eps_s, mode=mode)
 
-    simulator.run(n_steps=10000, verbose=True, n_sample=100, save_dir='mc_out')
+    simulator.run(n_steps=20000, verbose=True, n_sample=100, save_dir='mc_out')
