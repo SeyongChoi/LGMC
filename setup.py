@@ -8,12 +8,6 @@ extensions = [
         sources=["lgmc/dynamics/kawasaki.pyx"],
         include_dirs=[np.get_include()],
         language="c",
-    ),
-    Extension(
-        name="lgmc.dynamics.kawasaki_2",
-        sources=["lgmc/dynamics/kawasaki_2.pyx"],
-        include_dirs=[np.get_include()],
-        language="c",
     )
 ]
 
