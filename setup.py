@@ -20,13 +20,14 @@ setup(
     # Cython extensions
     ext_modules=cythonize(extensions, language_level=3),
     
-    # # Dependencies
-    # install_requires=[
-    #     "numpy>=1.21.0",
-    #     "tqdm",
-    #     "scipy",
-    #     # 필요 시 추가
-    # ],
+    # Dependencies
+    install_requires=[
+        "numpy>=1.21.0",
+        "tqdm",
+        "cython",
+        "pyyaml"
+        # 필요 시 추가
+    ],
 
     # CLI entry point
     entry_points={
