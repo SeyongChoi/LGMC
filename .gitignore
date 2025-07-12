@@ -2,6 +2,8 @@
 /old_fortran/
 /lgmc.egg-info/
 /build/
+/nucleation/
+/pillared_wetting/
 *.c
 *.pyd
 *.pyc
