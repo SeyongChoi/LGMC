@@ -99,6 +99,7 @@ def main():
     logger.info(f"|{'# of sampling':^21}| {str(n_sample):<136} |")
     logger.info(f"|{'Save Dir':^21}| {str(save_dir):<136} |")
     logger.info(f"|{'Verbose':^21}| {str(verbose):<136} |")
+    logger.info(f"|{'Logging':^21}| {str(log_path):<136} |")
     logger.info('-' * 162)
     logger.info('\n')
     # ---------------------------------------------------------------------------------------------
