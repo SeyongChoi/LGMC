@@ -91,8 +91,8 @@ def main():
     logger.info(f"|{'System':^21}| {str(sys):<136} |")
     logger.info(f"|{'PBC':^21}| {str(pbc):<136} |")
     logger.info(f"|{'Temperature':^21}| {str(temp):<136} |")
-    logger.info(f"|{'eps_{NN}':^21}| {str(eps_NN):<136} |")
-    logger.info(f"|{'eps_{surf}':^21}| {str(eps_s):<136} |")
+    logger.info(f"|{'eps_NN':^21}| {str(eps_NN):<136} |")
+    logger.info(f"|{'eps_surf':^21}| {str(eps_s):<136} |")
     logger.info(f"|{'Dynamics':^21}| {str(dynamics):<136} |")
     logger.info(f"|{'mu':^21}| {str(mu):<136} |")
     logger.info(f"|{'# of MC step':^21}| {str(n_steps):<136} |")
@@ -118,7 +118,12 @@ def main():
     simulator.run(n_steps=n_steps, verbose=verbose, n_sample=n_sample, save_dir=save_dir)
     time_e = time.time()
     logger.info(f'Finish the LGMC Simulation(took: {time_e - time_s:.2f}s[{(time_e - time_s)/60:.2f}min])')
-
+    # ---------------------------------------------------------------------------------------------
+    # Logging 종료 및 정리
+    logger.removeHandler(ch)
+    logger.removeHandler(fh)
+    fh.close()
+    logging.shutdown()
 
 if __name__=='__main__':
     main()
