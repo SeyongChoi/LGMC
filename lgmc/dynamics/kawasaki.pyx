@@ -128,16 +128,17 @@ cdef int get_neighbor_sum(int64_t[:, :, :] lattice,
 
 
 #----------------------------------------
-# 표면 판정 함수
-# z 방향으로 한 칸 아래가 2(예: 빈 공간)라면 현재 위치는 표면으로 간주
+# 표면 접촉 판정 함수
+# z 방향으로 한 칸 아래가 2라면 현재 위치는 표면과 접촉한 것으로 간주
 @cython.boundscheck(False)
 @cython.wraparound(False)
-cdef inline int is_surface(int x, int y, int z,
+cdef inline int is_contact_surface(int x, int y, int z,
                             int64_t[:, :, :] lattice) nogil:
-    # 표면층 판정 (z==1 위치 바로 아래가 2인 경우)
+    # 표면과 접촉 판정 (z==1 위치 바로 아래가 2인 경우)
     if z - 1 < 0:
         return 0
     return 1 if lattice[x, y, z-1] == 2 else 0
+
 
 #----------------------------------------
 # PBC 경계면 복사 처리 (입자 이동후 update)
@@ -282,9 +283,9 @@ cpdef int move_hete(int64_t[:, :, :] lattice,
         ci_sum = get_neighbor_sum(lattice, x,y,z, pbc0,pbc1,pbc2)
         cj_sum = get_neighbor_sum(lattice, nx,ny,nz, pbc0,pbc1,pbc2)
 
-        # 표면 여부 판정
-        ci_s = is_surface(x, y, z, lattice)
-        cj_s = is_surface(nx, ny, nz, lattice)
+        # 표면 접촉 여부 판정
+        ci_s = is_contact_surface(x, y, z, lattice)
+        cj_s = is_contact_surface(nx, ny, nz, lattice)
 
         # 에너지 변화량 계산 (표면 포함)
         dH = calc_delta_H_hete(ci, cj, ci_sum, cj_sum, ci_s, cj_s, hi)
