@@ -20,13 +20,13 @@ making it suitable for physical and chemical simulations on surfaces or porous m
 -----
 
 ## Usage
-1. Installation
+### 1. Installation
 ```bash
 git clone https://github.com/SeyongChoi/LGMC.git
 cd LGMC
 pip install -e .
 ```
-2. Make input configurations file (.yaml)
+### 2. Make input configurations file (.yaml)
 ```yaml
 # Simulation Mode
 mode: 'nucleation'      # 'nucleation' or 'wetting [not yet]'
@@ -53,7 +53,7 @@ save_dir: 'mc_out'      # Directory to save lattice [.xyz], default: './mc_out'
 # logging
 log: 'log.log'          # log file name, default: {mode}_{sys}_R{r}c{conc}t{temp}_{dynamics}.log
 ```
-3. Run the simulation
+### 3. Run the simulation
 ```bash
 # run the simulation
 lgmc --input_file configs/input_nucleation.yaml
