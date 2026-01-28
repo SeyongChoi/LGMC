@@ -194,7 +194,7 @@ cpdef int move_homo(int64_t[:, :, :] lattice,
     cdef int ci, cj, ci_sum, cj_sum, offset_idx, accepted = 0
     cdef double prob, dH
     
-    for i in prange(n, nogil=False):
+    for i in range(n):
         x = coords[i,0]; y = coords[i,1]; z = coords[i,2]
 
         # 이동 방향 난수 선택은 GIL 필요 (rand 함수 호출 때문)
@@ -256,7 +256,7 @@ cpdef int move_hete(int64_t[:, :, :] lattice,
     cdef int ci, cj, ci_sum, cj_sum, ci_s, cj_s, offset_idx, accepted = 0
     cdef double prob, dH
 
-    for i in prange(n, nogil=False):
+    for i in range(n):
         x = coords[i,0]; y = coords[i,1]; z = coords[i,2]
 
         with gil:

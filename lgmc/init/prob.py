@@ -14,7 +14,7 @@ class Prob:
         eps_s (Optional[float]): Surface interaction energy (for heterogeneous systems, relative to eps_nn).
         mu (Optional[float]): Chemical potential (required for Glauber dynamics, relative to eps_nn).
         NN (int): Number of nearest neighbors.
-        sys (str): System type ('homo' or 'hete').
+        sys (str): System type ('homo' or 'hete' or 'pillar').
         mode (str): Dynamics mode ('glauber' or 'kawasaki').
         hi (np.ndarray): Local energy table.
         tprob (Optional[np.ndarray]): Transition probability table (for Glauber mode).
@@ -31,6 +31,8 @@ class Prob:
     ):
         # Number of nearest neighbors
         self.NN = num_NN
+        # Number of contact states
+        self.num_contact_states = 36 if sys == 'pillar' else 0
 
         # Simulation temperature
         self.temp = temp                   # T* = T / Tc
@@ -43,7 +45,7 @@ class Prob:
 
         # System type
         self.sys = sys
-        if sys == 'hete' and eps_s is None:
+        if (sys == 'hete' or sys == 'pillar') and eps_s is None:
             raise ValueError("Heterogeneous system must define surface interaction energy eps_s.")
 
         # Dynamics mode
@@ -56,8 +58,10 @@ class Prob:
             self.hi = self._init_local_h_homo()
         elif sys == 'hete':
             self.hi = self._init_local_h_hete()
+        elif sys == 'pillar':
+            self.hi = self._init_local_h_pillar()
         else:
-            raise ValueError("sys must be either 'homo' or 'hete'.")
+            raise ValueError("sys must be either 'homo' or 'hete' or 'pillar'.")
 
         # Initialize transition probability table (for Glauber dynamics)
         if mode == 'glauber':
@@ -65,6 +69,10 @@ class Prob:
                 self.tprob = self._init_trans_prob_homo()
             elif self.sys == 'hete':
                 self.tprob = self._init_trans_prob_hete()
+            elif self.sys == 'pillar':
+                self.tprob = self._init_trans_prob_pillar()
+            else:
+                raise ValueError("sys must be either 'homo' or 'hete' or 'pillar'.")
         elif mode == 'kawasaki':
             self.tprob = None
         else:
@@ -114,6 +122,28 @@ class Prob:
                     hi[ci, cs, cj_sum] = -0.5 * self.eps_nn * ci * cj_sum - self.eps_s * ci * cs
 
         return hi
+    
+    def _init_local_h_pillar(self) -> np.ndarray:
+        """
+        Initialize local energy hi[ci, cs, cj_sum] for pillar system.
+
+        lattice gas model:
+            ci = 0 → unoccupied | 1 → occupied
+            cs = contact state (0 to 35)
+        Returns:
+            np.ndarray: shape (2, 36, NN+1)
+        """
+        hi = np.zeros((2, self.num_contact_states, self.NN + 1), dtype=np.float64)
+
+        for ci in range(2):
+            for cs in range(self.num_contact_states):
+                # maximum number of NN for ci = self.NN,
+                # BUT we need local h even when ci doesn't have neighbors
+                for cj_sum in range(self.NN + 1):
+                    # multiply 0.5: avoid double counting for pair-wise interaction
+                    hi[ci, cs, cj_sum] = -0.5 * self.eps_nn * ci * cj_sum - self.eps_s * ci * cs
+
+        return hi
                 
     def _init_trans_prob_homo(self) -> np.ndarray:
         """
@@ -147,6 +177,27 @@ class Prob:
 
         for ci in range(2):
             for cs in range(2):
+                for cj_sum in range(self.NN + 1):
+                    # delH = H_new - H_old
+                    # ci=0: 0 → 1 transition → del_h = hi(1, cs, cj_sum) - hi(0, cs, cj_sum) - mu
+                    # ci=1: 1 → 0 transition → del_h = hi(0, cs, cj_sum) - hi(1, cs, cj_sum) + mu
+                    del_h = self.hi[1 - ci, cs, cj_sum] - self.hi[ci, cs, cj_sum] - (1 - 2 * ci) * self.mu
+                    tprob[ci, cs, cj_sum] = np.exp(-self.beta * del_h)
+
+        return tprob
+    
+    def _init_trans_prob_pillar(self) -> np.ndarray:
+        """
+        Initialize Glauber transition probability tprob[ci, cs, cj_sum]
+        for pillar system.
+
+        Returns:
+            np.ndarray: shape (2, 36, NN+1)
+        """
+        tprob = np.zeros((2, self.num_contact_states, self.NN + 1), dtype=np.float64)
+
+        for ci in range(2):
+            for cs in range(self.num_contact_states):
                 for cj_sum in range(self.NN + 1):
                     # delH = H_new - H_old
                     # ci=0: 0 → 1 transition → del_h = hi(1, cs, cj_sum) - hi(0, cs, cj_sum) - mu

@@ -6,6 +6,7 @@ from lgmc.init.prob import Prob
 from lgmc.init.lattice import Lattice
 from lgmc.utils.to_xyz import to_xyz
 from lgmc.dynamics.kawasaki import move_hete, move_homo, seed_c_rand
+from lgmc.dynamics.glauber import flip_homo, flip_hete
 
 
 class NucleationSimulator:
@@ -45,15 +46,24 @@ class NucleationSimulator:
                                   requirements={'C', 'O', 'W'})
         self.pbc = self.lattice_obj.pbc
         self.sys = self.lattice_obj.sys
+        self.mode = mode
         self.dim = self.lattice.shape[0]
 
         self.prob_obj = Prob(temp=temp, eps_NN=eps_NN, num_NN=num_NN, eps_s=eps_s,
                              sys=sys, mode=mode, mu=mu)
         self.beta = self.prob_obj.beta
-        if self.sys == 'homo':
-            self.hi_homo = self.prob_obj.hi
-        elif self.sys == 'hete':
-            self.hi_hete = self.prob_obj.hi
+        if self.mode == 'kawasaki':
+            if self.sys == 'homo': self.hi_homo = self.prob_obj.hi
+            elif self.sys == 'hete': self.hi_hete = self.prob_obj.hi
+        elif self.mode == 'glauber':
+            self.vol = (self.dim - 2)**3
+
+            if self.sys == 'homo': 
+                self.hi_homo = self.prob_obj.hi
+                self.tprob_homo = self.prob_obj.tprob
+            elif self.sys == 'hete':
+                self.hi_hete = self.prob_obj.hi
+                self.tprob_hete = self.prob_obj.tprob
         else:
             raise ValueError()
 
@@ -69,7 +79,7 @@ class NucleationSimulator:
              save_dir: Optional[str] = None,
              n_sample: Optional[int] = 1) -> None:
         """
-        Perform Kawasaki MC steps and optionally save extxyz files per step.
+        Perform MC steps and optionally save extxyz files per step.
 
         Args:
             n_steps (int): number of MC steps (1 step = n_particle attempts).
@@ -80,34 +90,51 @@ class NucleationSimulator:
             None
         """
         rng = np.random.default_rng()
-        it = tqdm(range(n_steps), desc='Kawasaki MC steps') if verbose else range(n_steps)
+        it = tqdm(range(n_steps), desc=f'{self.mode} MC steps') if verbose else range(n_steps)
 
         for step_idx in it:
-            # 1. 버퍼 층을 제외한 모든 입자 좌표 (ci = 1) 수집 후 셔플
-            particle_positions = np.argwhere(self.lattice[1:-1, 1:-1, 1:-1] == 1) + 1 
-            positions = np.require(particle_positions.astype(np.int64),
-                                            dtype=np.int64,
-                                            requirements={'C', 'O', 'W'})
-            rng.shuffle(positions)
+            # --- [1] Kawasaki Dynamics ---
+            if self.mode == 'kawasaki':
+                # 1. 버퍼 층을 제외한 모든 입자 좌표 (ci = 1) 수집 후 셔플
+                particle_positions = np.argwhere(self.lattice[1:-1, 1:-1, 1:-1] == 1) + 1 
+                positions = np.require(particle_positions.astype(np.int64),
+                                                dtype=np.int64,
+                                                requirements={'C', 'O', 'W'})
+                rng.shuffle(positions)
 
-            # print(particle_positions)
-            if self.sys == 'homo':
-                accepted=move_homo(self.lattice,
-                          self.hi_homo,
-                          self.neighbor_offsets,
-                          self.beta,
-                          self.pbc[0], self.pbc[1], self.pbc[2],
-                          positions, particle_positions.shape[0])
-            elif self.sys == 'hete':
-                accepted=move_hete(self.lattice,
-                          self.hi_hete,
-                          self.neighbor_offsets,
-                          self.beta,
-                          self.pbc[0], self.pbc[1], self.pbc[2],
-                          positions, particle_positions.shape[0])
-            else:
-                raise ValueError()
+                # print(particle_positions)
+                if self.sys == 'homo':
+                    accepted=move_homo(self.lattice,
+                            self.hi_homo,
+                            self.neighbor_offsets,
+                            self.beta,
+                            self.pbc[0], self.pbc[1], self.pbc[2],
+                            positions, particle_positions.shape[0])
+                elif self.sys == 'hete':
+                    accepted=move_hete(self.lattice,
+                            self.hi_hete,
+                            self.neighbor_offsets,
+                            self.beta,
+                            self.pbc[0], self.pbc[1], self.pbc[2],
+                            positions, particle_positions.shape[0])
+                else:
+                    raise ValueError()
             
+            # --- [2] Glauber Dynamics (New) ---            
+            elif self.mode == 'glauber':
+                if self.sys == 'homo':
+                    accepted=flip_homo(self.lattice,
+                            self.tprob_homo,
+                            self.pbc[0], self.pbc[1], self.pbc[2],
+                            self.vol)
+                elif self.sys == 'hete':
+                    accepted=flip_hete(self.lattice,
+                            self.tprob_hete,
+                            self.pbc[0], self.pbc[1], self.pbc[2],
+                            self.vol)
+                else:
+                    raise ValueError()
+
             if save_dir is not None and (step_idx % n_sample == 0):
                 os.makedirs(save_dir, exist_ok=True)
                 fname = f"{save_dir}/lattice_step_{step_idx:07d}.extxyz"
@@ -223,9 +250,10 @@ if __name__=='__main__':
     temp = 0.2
     eps_NN = 1.0
     eps_s = 1.1 * eps_NN
-    mode = 'kawasaki'
+    mu = -3.0 * eps_NN
+    mode = 'glauber' #'kawasaki'
     
     simulator = NucleationSimulator(r=r, conc=conc, pbc=pbc, sys=sys,
-                                    temp=temp, eps_NN=eps_NN, eps_s=eps_s, mode=mode)
+                                    temp=temp, eps_NN=eps_NN, eps_s=eps_s, mode=mode, mu=mu)
 
     simulator.run(n_steps=20000, verbose=True, n_sample=100, save_dir='mc_out')
