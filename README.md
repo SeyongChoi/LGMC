@@ -15,7 +15,6 @@ making it suitable for physical and chemical simulations on surfaces or porous m
 
 -----
 **Status:** *In progress* 
-- [ ] Implement the Glauber Dynamics module
 - [ ] Wetting simulation mode
 -----
 
@@ -37,7 +36,7 @@ conc: 0.1               # concentration of particle in lattice, default: 0.1
 sys: 'homo'             # nulceation system, 'homo' or 'hete'
 
 # For dynamics,
-dynamics: 'kawasaki'    # the Method of Dynamics, 'kawasaki' or 'glauber [not yet]'
+dynamics: 'kawasaki'    # the Method of Dynamics, 'kawasaki' or 'glauber'
 pbc: [True, True, True] # PBC of each axis [x, y, z], default: [True, True, True]
 temp: 0.2               # the dimensionless temperature (T/Tc), default: 0.1
 eps_NN: 1.0             # the dimensionless epsilon_nn, default: 1.0
