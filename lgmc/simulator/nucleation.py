@@ -247,16 +247,19 @@ class NucleationSimulator:
         return to_xyz(self.dim, self.lattice, filename, comment)
     
 if __name__=='__main__':
+    from lgmc.utils.constant import Beta_c
     r = 20
     conc = 0.1
     sys = 'hete'
     pbc = [True, True, True] if sys == 'homo' else [True, True, False]
     temp = 0.46
     eps_NN = 1.0
-    eps_s = 0.1 * eps_NN
+    eps_s = 0.5 * eps_NN
     mu_coex = -3.0 * eps_NN
-    RH = 1.05
-    mu = mu_coex + eps_NN*temp*np.log(RH)
+    RH = 1.20
+    # mu = mu_coex + eps_NN*temp*np.log(RH)
+    beta = Beta_c / temp
+    mu = mu_coex + np.log(RH)/beta
     mode = 'glauber' #'kawasaki'
     
     simulator = NucleationSimulator(r=r, conc=conc, pbc=pbc, sys=sys,
