@@ -5,6 +5,7 @@
 /nucleation/
 /pillared_wetting/
 *.c
+*.so
 *.pyd
 *.pyc
 *.extxyz

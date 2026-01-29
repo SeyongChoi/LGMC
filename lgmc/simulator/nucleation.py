@@ -53,8 +53,12 @@ class NucleationSimulator:
                              sys=sys, mode=mode, mu=mu)
         self.beta = self.prob_obj.beta
         if self.mode == 'kawasaki':
-            if self.sys == 'homo': self.hi_homo = self.prob_obj.hi
-            elif self.sys == 'hete': self.hi_hete = self.prob_obj.hi
+            if self.sys == 'homo': 
+                self.hi_homo = self.prob_obj.hi
+                self.hi_homo_dyn = self.prob_obj.hi_dyn
+            elif self.sys == 'hete': 
+                self.hi_hete = self.prob_obj.hi
+                self.hi_hete_dyn = self.prob_obj.hi_dyn
         elif self.mode == 'glauber':
             self.vol = (self.dim - 2)**3
 
@@ -105,14 +109,14 @@ class NucleationSimulator:
                 # print(particle_positions)
                 if self.sys == 'homo':
                     accepted=swap_homo(self.lattice,
-                            self.hi_homo,
+                            self.hi_homo_dyn,
                             self.neighbor_offsets,
                             self.beta,
                             self.pbc[0], self.pbc[1], self.pbc[2],
                             positions, particle_positions.shape[0])
                 elif self.sys == 'hete':
                     accepted=swap_hete(self.lattice,
-                            self.hi_hete,
+                            self.hi_hete_dyn,
                             self.neighbor_offsets,
                             self.beta,
                             self.pbc[0], self.pbc[1], self.pbc[2],
@@ -245,13 +249,13 @@ class NucleationSimulator:
 if __name__=='__main__':
     r = 20
     conc = 0.1
-    sys = 'homo'
+    sys = 'hete'
     pbc = [True, True, True] if sys == 'homo' else [True, True, False]
     temp = 0.46
     eps_NN = 1.0
-    eps_s = 1.1 * eps_NN
+    eps_s = 0.1 * eps_NN
     mu_coex = -3.0 * eps_NN
-    RH = 1.5
+    RH = 1.05
     mu = mu_coex + eps_NN*temp*np.log(RH)
     mode = 'glauber' #'kawasaki'
     
