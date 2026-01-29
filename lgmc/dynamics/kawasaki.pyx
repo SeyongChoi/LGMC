@@ -183,7 +183,7 @@ cdef inline void update_pbc_boundary(int64_t[:, :, :] lattice,
 # coords: 이동 후보 좌표 리스트
 # n: 후보 개수
 # 반환값: 수락된 이동 횟수
-cpdef int move_homo(int64_t[:, :, :] lattice,
+cpdef int swap_homo(int64_t[:, :, :] lattice,
                     double[:, :] hi,
                     int64_t[:, :] neighbor_offsets,
                     double beta,
@@ -245,7 +245,7 @@ cpdef int move_homo(int64_t[:, :, :] lattice,
 # 이질계 이동 함수 (표면 구분 포함)
 # 파라미터는 move_homo와 유사하나,
 # hi는 3D 배열, 표면 여부 확인, 조건이 좀 더 까다로움
-cpdef int move_hete(int64_t[:, :, :] lattice,
+cpdef int swap_hete(int64_t[:, :, :] lattice,
                     double[:, :, :] hi,
                     int64_t[:, :] neighbor_offsets,
                     double beta,
