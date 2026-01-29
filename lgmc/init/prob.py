@@ -56,10 +56,13 @@ class Prob:
         # Initialize local energy table
         if sys == 'homo':
             self.hi = self._init_local_h_homo()
+            self.hi_dyn = self._init_dynamics_h_homo()
         elif sys == 'hete':
             self.hi = self._init_local_h_hete()
+            self.hi_dyn = self._init_dynamics_h_hete()
         elif sys == 'pillar':
             self.hi = self._init_local_h_pillar()
+            self.hi_dyn = self._init_dynamics_h_pillar()
         else:
             raise ValueError("sys must be either 'homo' or 'hete' or 'pillar'.")
 
@@ -144,7 +147,66 @@ class Prob:
                     hi[ci, cs, cj_sum] = -0.5 * self.eps_nn * ci * cj_sum - self.eps_s * ci * cs
 
         return hi
+    
+    def _init_dynamics_h_homo(self) -> np.ndarray:
+        """
+        Initialize dynamics energy hi_dyn[ci, cj_sum]
+        for homogeneous system.
+
+        Returns:
+            np.ndarray: shape (2, NN+1)
+        """
+        hi_dyn = np.zeros((2, self.NN + 1), dtype=np.float64)
+
+        for ci in range(2):
+            # maximum number of NN for ci = self.NN,
+            # BUT we need local h even when ci doesn't have neighbors
+            for cj_sum in range(self.NN + 1):
                 
+                hi_dyn[ci, cj_sum] = -1.0 * self.eps_nn * ci * cj_sum
+
+        return hi_dyn
+    
+    def _init_dynamics_h_hete(self) -> np.ndarray:
+        """
+        Initialize dynamics energy hi_dyn[ci, cj_sum]
+        for heterogeneous system.
+
+        Returns:
+            np.ndarray: shape (2, 2, NN+1)
+        """
+        hi_dyn = np.zeros((2, 2, self.NN + 1), dtype=np.float64)
+
+        for ci in range(2):
+            for cs in range(2):
+            # maximum number of NN for ci = self.NN,
+            # BUT we need local h even when ci doesn't have neighbors
+                for cj_sum in range(self.NN + 1):
+                
+                    hi_dyn[ci, cs, cj_sum] = -1.0 * self.eps_nn * ci * cj_sum - self.eps_s * ci * cs
+
+        return hi_dyn
+    
+    def _init_dynamics_h_pillar(self) -> np.ndarray:
+        """
+        Initialize dynamics energy hi_dyn[ci, cj_sum]
+        for pillar system.
+
+        eturns:
+            np.ndarray: shape (2, 36, NN+1)
+        """
+        hi_dyn = np.zeros((2, self.num_contact_states, self.NN + 1), dtype=np.float64)
+
+        for ci in range(2):
+            for cs in range(self.num_contact_states):
+            # maximum number of NN for ci = self.NN,
+            # BUT we need local h even when ci doesn't have neighbors
+                for cj_sum in range(self.NN + 1):
+                
+                    hi_dyn[ci, cs, cj_sum] = -1.0 * self.eps_nn * ci * cj_sum - self.eps_s * ci * cs
+
+        return hi_dyn
+
     def _init_trans_prob_homo(self) -> np.ndarray:
         """
         Initialize Glauber transition probability tprob[ci, cj_sum]
@@ -160,7 +222,7 @@ class Prob:
                 # delH = H_new - H_old
                 # ci=0: 0 → 1 transition → del_h = hi(1, cj_sum) - hi(0, cj_sum) - mu
                 # ci=1: 1 → 0 transition → del_h = hi(0, cj_sum) - hi(1, cj_sum) + mu
-                del_h = self.hi[1 - ci, cj_sum] - self.hi[ci, cj_sum] - (1 - 2 * ci) * self.mu
+                del_h = self.hi_dyn[1 - ci, cj_sum] - self.hi_dyn[ci, cj_sum] - (1 - 2 * ci) * self.mu
                 tprob[ci, cj_sum] = np.exp(-self.beta * del_h)
 
         return tprob
@@ -181,7 +243,7 @@ class Prob:
                     # delH = H_new - H_old
                     # ci=0: 0 → 1 transition → del_h = hi(1, cs, cj_sum) - hi(0, cs, cj_sum) - mu
                     # ci=1: 1 → 0 transition → del_h = hi(0, cs, cj_sum) - hi(1, cs, cj_sum) + mu
-                    del_h = self.hi[1 - ci, cs, cj_sum] - self.hi[ci, cs, cj_sum] - (1 - 2 * ci) * self.mu
+                    del_h = self.hi_dyn[1 - ci, cs, cj_sum] - self.hi_dyn[ci, cs, cj_sum] - (1 - 2 * ci) * self.mu
                     tprob[ci, cs, cj_sum] = np.exp(-self.beta * del_h)
 
         return tprob
@@ -202,7 +264,7 @@ class Prob:
                     # delH = H_new - H_old
                     # ci=0: 0 → 1 transition → del_h = hi(1, cs, cj_sum) - hi(0, cs, cj_sum) - mu
                     # ci=1: 1 → 0 transition → del_h = hi(0, cs, cj_sum) - hi(1, cs, cj_sum) + mu
-                    del_h = self.hi[1 - ci, cs, cj_sum] - self.hi[ci, cs, cj_sum] - (1 - 2 * ci) * self.mu
+                    del_h = self.hi_dyn[1 - ci, cs, cj_sum] - self.hi_dyn[ci, cs, cj_sum] - (1 - 2 * ci) * self.mu
                     tprob[ci, cs, cj_sum] = np.exp(-self.beta * del_h)
 
         return tprob

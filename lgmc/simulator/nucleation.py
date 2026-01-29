@@ -5,7 +5,7 @@ from typing import Optional, Tuple, List
 from lgmc.init.prob import Prob
 from lgmc.init.lattice import Lattice
 from lgmc.utils.to_xyz import to_xyz
-from lgmc.dynamics.kawasaki import move_hete, move_homo, seed_c_rand
+from lgmc.dynamics.kawasaki import swap_hete, swap_homo, seed_c_rand
 from lgmc.dynamics.glauber import flip_homo, flip_hete
 
 
@@ -104,14 +104,14 @@ class NucleationSimulator:
 
                 # print(particle_positions)
                 if self.sys == 'homo':
-                    accepted=move_homo(self.lattice,
+                    accepted=swap_homo(self.lattice,
                             self.hi_homo,
                             self.neighbor_offsets,
                             self.beta,
                             self.pbc[0], self.pbc[1], self.pbc[2],
                             positions, particle_positions.shape[0])
                 elif self.sys == 'hete':
-                    accepted=move_hete(self.lattice,
+                    accepted=swap_hete(self.lattice,
                             self.hi_hete,
                             self.neighbor_offsets,
                             self.beta,
@@ -245,12 +245,14 @@ class NucleationSimulator:
 if __name__=='__main__':
     r = 20
     conc = 0.1
-    sys = 'hete'
+    sys = 'homo'
     pbc = [True, True, True] if sys == 'homo' else [True, True, False]
-    temp = 0.2
+    temp = 0.46
     eps_NN = 1.0
     eps_s = 1.1 * eps_NN
-    mu = -3.0 * eps_NN
+    mu_coex = -3.0 * eps_NN
+    RH = 1.5
+    mu = mu_coex + eps_NN*temp*np.log(RH)
     mode = 'glauber' #'kawasaki'
     
     simulator = NucleationSimulator(r=r, conc=conc, pbc=pbc, sys=sys,
